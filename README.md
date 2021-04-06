@@ -1,3 +1,6 @@
+## Update:
+For running the code in Python 3.8 and Tensorflow 2.4.1, please refer the branch py38_tf24.
+
 This repository contains code for the ACL 2017 paper *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*. 
 
 ## Looking for test set output?
