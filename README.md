@@ -1,3 +1,7 @@
+## Update message:
+The scripts in this branch have been updated to be able to run in Python 3.8 and Tensorflow 2.4.1
+**NOTE:** You need to load/install your own CUDA library to be able to use GPUs 
+
 This repository contains code for the ACL 2017 paper *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*. 
 
 ## Looking for test set output?
