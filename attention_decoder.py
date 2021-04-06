@@ -49,11 +49,14 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
     coverage: Coverage vector on the last step computed. None if use_coverage=False.
   """
   with variable_scope.variable_scope("attention_decoder") as scope:
-    batch_size = encoder_states.get_shape()[0].value # if this line fails, it's because the batch size isn't defined
-    attn_size = encoder_states.get_shape()[2].value # if this line fails, it's because the attention length isn't defined
+    #print(type(encoder_states.get_shape()))
+    #print(type(encoder_states.get_shape()[0]))
+    #print(encoder_states.get_shape()[0])
+    batch_size = encoder_states.get_shape()[0]#.value # if this line fails, it's because the batch size isn't defined
+    attn_size = encoder_states.get_shape()[2]#.value # if this line fails, it's because the attention length isn't defined
 
     # Reshape encoder_states (need to insert a dim)
-    encoder_states = tf.expand_dims(encoder_states, axis=2) # now is shape (batch_size, attn_len, 1, attn_size)
+    encoder_states = tf.compat.v1.expand_dims(encoder_states, axis=2) # now is shape (batch_size, attn_len, 1, attn_size)
 
     # To calculate attention, we calculate
     #   v^T tanh(W_h h_i + W_s s_t + b_attn)
@@ -74,7 +77,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
 
     if prev_coverage is not None: # for beam search mode with coverage
       # reshape from (batch_size, attn_length) to (batch_size, attn_len, 1, 1)
-      prev_coverage = tf.expand_dims(tf.expand_dims(prev_coverage,2),3)
+      prev_coverage = tf.compat.v1.expand_dims(tf.compat.v1.expand_dims(prev_coverage,2),3)
 
     def attention(decoder_state, coverage=None):
       """Calculate the context vector and attention distribution from the decoder state.
@@ -91,14 +94,14 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       with variable_scope.variable_scope("Attention"):
         # Pass the decoder state through a linear layer (this is W_s s_t + b_attn in the paper)
         decoder_features = linear(decoder_state, attention_vec_size, True) # shape (batch_size, attention_vec_size)
-        decoder_features = tf.expand_dims(tf.expand_dims(decoder_features, 1), 1) # reshape to (batch_size, 1, 1, attention_vec_size)
+        decoder_features = tf.compat.v1.expand_dims(tf.compat.v1.expand_dims(decoder_features, 1), 1) # reshape to (batch_size, 1, 1, attention_vec_size)
 
         def masked_attention(e):
           """Take softmax of e then apply enc_padding_mask and re-normalize"""
           attn_dist = nn_ops.softmax(e) # take softmax. shape (batch_size, attn_length)
           attn_dist *= enc_padding_mask # apply mask
-          masked_sums = tf.reduce_sum(attn_dist, axis=1) # shape (batch_size)
-          return attn_dist / tf.reshape(masked_sums, [-1, 1]) # re-normalize
+          masked_sums = tf.compat.v1.reduce_sum(attn_dist, axis=1) # shape (batch_size)
+          return attn_dist / tf.compat.v1.reshape(masked_sums, [-1, 1]) # re-normalize
 
         if use_coverage and coverage is not None: # non-first step of coverage
           # Multiply coverage vector by w_c to get coverage_features.
@@ -120,7 +123,7 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
           attn_dist = masked_attention(e)
 
           if use_coverage: # first step of training
-            coverage = tf.expand_dims(tf.expand_dims(attn_dist,2),2) # initialize coverage
+            coverage = tf.compat.v1.expand_dims(tf.expand_dims(attn_dist,2),2) # initialize coverage
 
         # Calculate the context vector from attn_dist and encoder_states
         context_vector = math_ops.reduce_sum(array_ops.reshape(attn_dist, [batch_size, -1, 1, 1]) * encoder_states, [1, 2]) # shape (batch_size, attn_size).
@@ -139,13 +142,14 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
       # Re-calculate the context vector from the previous step so that we can pass it through a linear layer with this step's input to get a modified version of the input
       context_vector, _, coverage = attention(initial_state, coverage) # in decode mode, this is what updates the coverage vector
     for i, inp in enumerate(decoder_inputs):
-      tf.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
+      tf.compat.v1.logging.info("Adding attention_decoder timestep %i of %i", i, len(decoder_inputs))
       if i > 0:
         variable_scope.get_variable_scope().reuse_variables()
 
       # Merge input and previous attentions into one vector x of the same size as inp
       input_size = inp.get_shape().with_rank(2)[1]
-      if input_size.value is None:
+      #if input_size.value is None:
+      if input_size is None:
         raise ValueError("Could not infer input size from input: %s" % inp.name)
       x = linear([inp] + [context_vector], input_size, True)
 
@@ -162,9 +166,9 @@ def attention_decoder(decoder_inputs, initial_state, encoder_states, enc_padding
 
       # Calculate p_gen
       if pointer_gen:
-        with tf.variable_scope('calculate_pgen'):
+        with tf.compat.v1.variable_scope('calculate_pgen'):
           p_gen = linear([context_vector, state.c, state.h, x], 1, True) # a scalar
-          p_gen = tf.sigmoid(p_gen)
+          p_gen = tf.compat.v1.sigmoid(p_gen)
           p_gens.append(p_gen)
 
       # Concatenate the cell_output (= decoder state) and the context vector, and pass them through a linear layer
@@ -215,14 +219,14 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None):
       total_arg_size += shape[1]
 
   # Now the computation.
-  with tf.variable_scope(scope or "Linear"):
-    matrix = tf.get_variable("Matrix", [total_arg_size, output_size])
+  with tf.compat.v1.variable_scope(scope or "Linear"):
+    matrix = tf.compat.v1.get_variable("Matrix", [total_arg_size, output_size])
     if len(args) == 1:
-      res = tf.matmul(args[0], matrix)
+      res = tf.compat.v1.matmul(args[0], matrix)
     else:
-      res = tf.matmul(tf.concat(axis=1, values=args), matrix)
+      res = tf.compat.v1.matmul(tf.concat(axis=1, values=args), matrix)
     if not bias:
       return res
-    bias_term = tf.get_variable(
-        "Bias", [output_size], initializer=tf.constant_initializer(bias_start))
+    bias_term = tf.compat.v1.get_variable(
+        "Bias", [output_size], initializer=tf.compat.v1.constant_initializer(bias_start))
   return res + bias_term
